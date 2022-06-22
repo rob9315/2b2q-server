@@ -108,11 +108,17 @@ fn save_dir() -> PathBuf {
         .unwrap_or_else(|_| ".".into())
         .into()
 }
+fn save_file_ext() -> Option<String> {
+    std::env::var("SAVE_FILE_EXT").ok()
+}
 fn save_path() -> Option<(PathBuf, String)> {
     UNIX_EPOCH.elapsed().ok().map(|t| {
         let mut path = save_dir();
         let t = t.as_nanos().to_string();
         path.push(&t);
+        if let Some(ext) = save_file_ext() {
+            path.set_extension(ext);
+        }
         (path, t)
     })
 }
