@@ -16,15 +16,17 @@ use tokio::sync::Mutex;
 
 static TAR: OnceCell<Arc<Mutex<Option<Result<piper::Arc<Vec<u8>>, ()>>>>> = OnceCell::const_new();
 
-struct ArcBytes(piper::Arc<Vec<u8>>);
+struct ArcBytes(piper::Arc<Vec<u8>>, u64);
 impl AsyncRead for ArcBytes {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut std::task::Context<'_>,
         buf: &mut tokio::io::ReadBuf<'_>,
     ) -> Poll<Result<(), std::io::Error>> {
-        let x = AsyncRead::poll_read(Pin::new(&mut &self.0[..]), cx, buf);
-        *self = ArcBytes(piper::Arc::new(vec![]));
+        let mut cursor = std::io::Cursor::new(&self.0[..]);
+        cursor.set_position(self.1);
+        let x = AsyncRead::poll_read(Pin::new(&mut cursor), cx, buf);
+        self.1 = cursor.position();
         x
     }
 }
@@ -71,7 +73,7 @@ async fn tar() -> Result<ArcBytes, &'static str> {
             );
             unsafe { read.as_ref().unwrap_unchecked().clone() }
         })
-        .map(ArcBytes)
+        .map(|x|ArcBytes(x, 0))
         .map_err(|()| "internal error")
 }
 
